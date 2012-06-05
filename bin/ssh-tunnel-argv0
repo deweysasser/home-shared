@@ -1,0 +1,29 @@
+#! /bin/sh -e
+# calls SSH on it's name.  Functions rather like an alias but is a
+# real program instead of a shell function 
+# example:  ln -s ssh-argv0 home 
+# now do "home uname -a" instead of "ssh home uname -a"
+
+myname=${0##*/}
+
+if [ "${myname}" = "ssh-tunnel-argv0" ]
+then
+  echo 'This script should be called from a symlink' 1>&2;
+  exit 1;
+fi
+
+if [ "$1" = "-desktop" ] ; then
+    vnctunnel $myname
+    exit $?
+fi
+
+relay=`awk -F: "/^$myname/{print \\\$2}" $HOME/.relay`
+
+if [ -n "$relay" ] ; then
+   ssh -t $relay ssh $myname "$@"
+else 
+   ssh $myname "$@"
+fi
+
+# clear the screen when we're done
+clear

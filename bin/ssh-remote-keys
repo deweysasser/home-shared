@@ -1,0 +1,143 @@
+#!/bin/bash
+
+# purpose -- manipulate keys on remote hosts:  install, remove, display or any combination.  When installing keys, eliminates duplicates.  Therefore, operation is idempotent.
+# author -- Dewey Sasser <dewey@sasser.com>
+# requires:  Local side:  bash, cat.  If PERL is available, it can enhanced listings
+#            remote side: sh, sed, mkdir, chmod, touch, cat, sort, uniq, mv
+#                         I use standard commands and language, so any unix like platform should work
+# tested on:  cygin and Ubuntu Linux local, cygwin, Ubuntu, RedHat, Oracle and Solaris x86 remote 
+# NOTES:  
+#   - combine this with "sshpass" for a convenient way to install ssh keys on multiple servers when you know 
+#     the root pass but don't have a key installed.
+#   - Yes, there are a number of scripts like this floating around.  This one works for me.
+
+only=false
+verbose=false
+show=false
+fix=false
+tmpfile=/tmp/ssh-remove-keys.$$
+
+usage() {
+    echo "Usage:  $0 [-only] [-show] [-user USER] [-install keyfile] [-remove string] connection..."
+    echo "   -install FILE -- installs FILE into the authorized keys on the remote host"
+    echo "   -remove STRING -- removes the key matching STRING on the authorized keys on the remote host"
+    echo "   -show or -list -- displays the authorized-keys on the remote host in a pretty format"
+    echo "   at least one of -show -install or -remove required"
+    echo "   operations are always executed in order (remove, install, show)"
+    echo "   connection is an ssh connect string, e.g. user@host"
+    echo "   You may specify multiples of -install or -remove and multiple connections"
+}
+
+verbose() {
+    $verbose && echo "$@"
+}
+
+while [ $# -gt 0 ] ; do
+    case $1 in 
+        -v|-verbose) verbose=true;;
+        -only) only=true;;
+        -show|-list) show=true;;
+        -fix) fix=true;;
+        -user|-l) user=$2; shift;;
+        -remove) remove=("${remove[@]}" "$2"); shift;;
+        -install) install=("${install[@]}" "$2"); shift;;
+        -*) echo "Unknown option $1"; usage; exit 1;;
+        *) args="$args $1"
+    esac
+
+    shift
+done
+
+if [ -n "$args" ]  ; then
+    set $args
+fi
+
+if [ -z "${remove[*]}${install[*]}" -a $show == false ] ; then
+    echo "Nothing to install, remove or show"
+    usage
+    exit 1
+fi
+
+if [ -z "$*" ] ; then
+    echo "No connections specified"
+    usage
+    exit 1
+fi
+
+
+test -n "$user" && userArg="-l $user"
+
+
+for connection in $*; do
+    sshCmdFailed=false
+
+    for element in "${remove[@]}"; do
+        keylist="$keylist '$element'"
+        script="$script -e '/$element/d'"
+    done
+
+    sshCmd="${SSH_COMMAND:-ssh} $userArg $connection"
+
+    if [ -n "$script" ] ; then
+        verbose "Removing keys denoted by $keylist on $connection"
+        $sshCmd "test -r .ssh/authorized_keys && (sed $script .ssh/authorized_keys > .ssh/authorized_keys.new; mv -f .ssh/authorized_keys.new .ssh/authorized_keys)" || sshCmdFailed=true
+
+        if $sshCmdFailed; then
+            echo "Could not log in to $connection"
+            continue
+        fi
+    fi
+    
+    if [ -n "${install[*]}" ] ; then
+        verbose "Installing ${install[@]} to $connection"
+        if $only ; then
+            cat "${install[@]}" |  $sshCmd "mkdir -p .ssh; touch .ssh/authorized_keys; cat - | sort | uniq > .ssh/authorized_keys.new; mv -f .ssh/authorized_keys.new .ssh/authorized_keys; chmod -R og-rwx .ssh" || sshCmdFailed=true
+            
+        else
+            cat "${install[@]}" |  $sshCmd "mkdir -p .ssh; touch .ssh/authorized_keys; (test -r .ssh/authorized_keys && cat .ssh/authorized_keys; cat - ) | sort | uniq > .ssh/authorized_keys.new; mv -f .ssh/authorized_keys.new .ssh/authorized_keys; chmod -R og-rwx .ssh" || sshCmdFailed=true
+        fi
+
+        if $sshCmdFailed; then
+            echo "Could not log in to $connection"
+            continue
+        fi
+    fi
+
+    if $fix ; then
+        verbose "Fixing permissions in $connection"
+        $sshCmd 'chown -R `whoami` .ssh; chmod -R og-rwx .ssh'  || sshCmdFailed=true
+
+        if $sshCmdFailed; then
+            echo "Could not log in to $connection"
+            continue
+        fi
+    fi
+
+    if $show; then
+        $sshCmd "cat .ssh/authorized_keys" > $tmpfile || sshCmdFailed=true
+
+        if $sshCmdFailed; then
+            echo "Could not log in to $connection"
+            continue
+        fi
+
+        count=`sed -n -e '/^ssh/p' $tmpfile | wc -l `
+#        if $verbose; then
+        echo '######################################################################'
+        echo "#   $connection"
+        perl=`type -p perl`
+        if [ -n "$perl" -a -x "$perl" ] ; then
+            perl -n -e 'if(/^ssh-/) {($_, $key, $text) =split(/\s+/, $_, 3); push(@keys, $text);}
+END {
+$count=$#keys+1;
+print "#   $count keys:\n";
+foreach my $text (sort @keys) {
+print "#      - $text";
+}}' $tmpfile
+        fi
+        echo '######################################################################'
+#        fi
+        cat $tmpfile
+    fi
+done
+
