@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Purpose:  a tree graft that draws from git
+
+for dir in "$@"; do
+  git --git-dir "$dir/.git" ls-files | while read FILE; do
+      d=`dirname "$FILE"`
+      mkdir -p "$d"
+      ln -s "$dir/$FILE" "$d"
+   done
+done
+
