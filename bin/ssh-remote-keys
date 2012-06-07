@@ -11,6 +11,10 @@
 #     the root pass but don't have a key installed.
 #   - Yes, there are a number of scripts like this floating around.  This one works for me.
 
+# TODO:
+#   - Implement a "-copy" flag to copy the authorized_keys file from a reference machine
+#   - Validate the keys file given
+
 only=false
 verbose=false
 show=false
