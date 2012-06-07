@@ -1,13 +1,1 @@
-#!/bin/bash
-
-# purpose -- install some keys on the appropriate host
-
-if [ $# -lt 2 ] ; then
-    echo "Usage:  $0 keyfile connection"
-    exit 1
-fi
-
-keyfile=$1
-connection=$2
-
-cat $keyfile |  ssh $connection "mkdir -p .ssh; chmod -R og-rwx .ssh; touch .ssh/authorized_keys; cat .ssh/authorized_keys - | sort | uniq > .ssh/authorized_keys.new; mv -f .ssh/authorized_keys.new .ssh/authorized_keys"
+ssh-remote-keys
