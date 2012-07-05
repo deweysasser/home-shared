@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# purpose:  Rip a series of CDs as specified
+
+
+function usage() {
+    echo "ripcd [-start START] [-end|-count|-num END] [-device DEV] BASENAME"
+    exit 1
+}
+
+start=1
+end=100
+uname=`uname`
+
+if [[ $uname == CYGWIN* ]] ; then
+    device=/dev/scd0
+else
+    device=/dev/cdrom
+fi
+
+while [ -n "$*" ] ; do
+    case $1 in
+        -start) start=$2; shift;;
+        -end|-count|-num) end=$2; shift;;
+        -device) device=$2; shift;;
+        -h|-help|-\?) usage;;
+        -*) usage;;
+        *) base=$1;;
+    esac
+    shift;
+done
+
+# Validate the name
+
+if [ -z "$base" ] ; then
+    usage
+fi
+
+
+# Validate the device
+if [ ! -r $device ] ; then
+    echo "Cannot read ripping device $device.  Please specify with -device"
+    usage
+fi
+
+# start ripping
+num=$start
+
+while [ $num -le $end ] ; do
+
+    name="$base-disc$num.iso"
+    next=0
+
+    while [ $next -eq 0 ] ; do
+        read -p "Insert CD to rip for $name.  Press Enter to continue"
+        if [ -r $name ] ; then
+            read -p "$name exists.  Press Enter to overwrite"
+        fi
+
+        echo "Ripping $device to $name"
+        dd if=$device of=$name && next=1 || echo "Failed to rip $name.  Trying again"
+    done
+
+    let num=$num+1
+done
