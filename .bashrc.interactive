@@ -62,4 +62,5 @@ addListConditional MANPATH ~/man
 addListConditional PYTHONPATH ~/lib/python
 addListConditional PERL5LIB ~/lib/perl5
 
+echo "Loading .bashrc"
 . ~/.bashrc
