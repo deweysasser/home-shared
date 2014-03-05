@@ -1,0 +1,5 @@
+include = cat $HOME/.config/mr/`hostname`.conf
+include = cat $HOME/.config/mr/shared.conf
+include = cat $HOME/.config/mr/$USER.conf
+
+
