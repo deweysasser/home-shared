@@ -1,0 +1,65 @@
+# -*- shell-script -*-
+#testing
+. ~/.bash-prompt
+
+# Put any machine or domain specific overrides into 
+# ~/.conf/machine/$host
+
+function source-if() {
+    for file in "$@"; do
+	if [ -r "$file" ] ; then
+	    source "$file"
+	fi
+    done
+}
+
+source-if ~/.bash-interactive-functions
+
+
+export CVS_RSH=ssh
+
+alias which='type'
+
+alias more=less
+
+#general stuff
+. ~/.bash-functions
+
+alias start='cygstart'
+
+source-if ~/bin/share/pkgmgr-bootstrap.bsh
+
+export GNUSERV_SHOW_EMACS=1
+
+os=`uname -s`
+
+export PATH="$PATH:~/bin/$os"
+
+if [[ $os == [cC][yY][gG][wW][iI][nN]* ]] ;then
+    addPath ~/bin/nt
+fi
+
+export RSYNC_RSH=ssh
+
+hostOrDomainOverride -v .bash_login
+
+addPath ~/bin/share
+addPath /sbin
+addPath /usr/sbin
+
+ssh-setup
+
+#source-if ~/.bash_completion ~/.bash_completion_svn
+
+export SGML_CATALOG_FILES=c:/usr/dewey/etc/sgml/XMLCATALOG
+JAVA_DEBUG="-Xdebug -Xrunjdwp:transport=dt_socket,address=4444,server=y,suspend=n"
+
+export SVNROOT=svn+ssh://dewey@svn.sasser.ws/svn
+export CVSROOT=:ext:dewey@cvs.sasser.ws:/cvsroot
+export EDITOR=vi
+
+addListConditional MANPATH ~/man
+addListConditional PYTHONPATH ~/lib/python
+addListConditional PERL5LIB ~/lib/perl5
+
+. ~/.bashrc

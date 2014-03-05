@@ -1,0 +1,257 @@
+# -*- shell-script -*-
+# TODO:  Separate this file into interactive commands and scripting environment
+
+
+function isShellInteractive() {
+    case "$-" in
+        *i*)	return 0;;
+        *)	return 1;;
+    esac
+}
+
+function start()
+{
+    cygstart "$@"
+}
+
+
+function addPath()
+{
+    for path in "$@"; do
+	if echo $PATH | tr : '\n' | egrep "^$path\$" > /dev/null; then
+            echo > /dev/null
+	else
+            export PATH="$path":"$PATH"
+	fi
+    done
+    return 0
+}
+
+function addPathConditional() {
+    addListConditional PATH $1
+    return $?
+}
+
+function addList() {
+    eval export $1="$2":"\$$1"
+    return 0
+}
+
+function addListConditional() {
+    if [ -d $2 ] ; then
+        addList $@ && return 0
+    fi
+    return 1
+}
+
+# this next function arranges for all your cygwin windows to share the
+# same ssh-agent setup and automatically maintain that setup for you
+
+# call ssh-setup in your ~/.bash_profile (you'll type in your pass
+# phrase only when there's no agent already running) and all your
+# cygwin windows will be SSH agent enabled
+
+function ssh-use-current()
+{
+    local HOST=`hostname`
+    local agentFile=~/.keychain/${HOST}-sh
+
+    [ -r $agentFile ] && source $agentFile;
+}
+
+function command-exists() {
+    if which $1 > /dev/null 2>&1 ; then
+	return 0
+    else
+	return 1
+    fi
+}
+
+function ssh-setup()
+{
+    ~/.ssh/generate-config-file
+    local files
+    if command-exists keychain ; then
+	if [ -r $HOME/.ssh/config ] ; then
+	    for file in `awk '/IdentityFile/{print $2}' $HOME/.ssh/config`
+	    do
+		file=${file/\~/$HOME}
+		[ -r $file ] && files="$files $file"
+	    done
+	    keychain --quiet $files  && ssh-use-current || echo "error running keychain"
+	fi
+    fi
+}
+
+function ssh-destroy()
+{
+    if command-exists  keychain ; then
+	keychain --quiet --stop mine
+    fi
+}
+
+function ssh-clean-agents()
+{
+    if command-exists  keychain ; then
+	keychain --stop all
+    fi
+}
+
+
+function process-exists()
+{
+    local pid=$1
+
+    if [ "$pid" == "" ] ; then
+        return 1
+    fi
+
+    kill -0 $pid 2>/dev/null
+
+    return $?
+}
+
+
+function getDomain
+{
+    if [ -n "$cachedDomainName" ] ; then
+        echo $cachedDomainName
+        return 0
+    fi
+
+    domain=`domainname 2>/dev/null`
+    # cygwin doesn't have this command, so failures should be handled separately
+    if [ $? -eq 0 ] ; then
+        cachedDomainName=$domain
+    elif [ -n "$USERDNSDOMAIN" ] ; then
+        cachedDomainName=$USERDNSDOMAIN
+    elif [ -f /etc/dnsdomainname ] ; then
+        cachedDomainName=`cat /etc/dnsdomainname`
+    else
+        return 1
+    fi
+
+    echo $cachedDomainName
+    return 0
+    
+}
+
+host=`hostname`
+domain=`getDomain`
+
+function getDomainConfigDir
+{
+	if [ -d $HOME/.conf/${domain:-`getDomain`} ] ; then
+		echo "$HOME/.conf/$domain"
+		return 0
+	else
+		return 1
+	fi
+}
+
+
+function getMachineConfigDir
+{
+	if [ -n "$domain" -a -d $HOME/.conf/$host.$domain ] ; then
+		echo "$HOME/.conf/$host.$domain"
+		return 0
+	elif [ -d $HOME/.conf/$host ] ; then
+		echo "$HOME/.conf/$host"
+		return 0
+	else
+		return 1
+	fi
+}
+
+function sourceIfExists
+{
+    local verbose
+    if [ $1 == "-v" ] ; then
+        verbose=true
+        shift
+    else
+        verbose=false
+    fi
+
+    if [ -r $1 ] ; then
+        $verbose && echo "Reading additional commands from $1"
+        source $1 && return 0
+    else 
+        return 0
+    fi
+
+    return 1
+}
+
+
+function hostOrDomainOverride
+{
+    local verbose
+
+    if [ $1 == "-v" ] ; then
+        verbose="-v"
+        shift
+    fi
+    
+    file=$1
+
+    
+    domainConf=`getDomainConfigDir`
+    sourceIfExists $verbose $domainConf/$file
+
+#    [ -n $verbose ] && echo "Checking in $domainConf/$file"
+
+    machineConf=`getMachineConfigDir`
+    sourceIfExists $verbose $machineConf/$file 
+
+#    [ -n $verbose ] && echo "Checking in $machineConf/$file"
+
+}
+
+function isWindows()
+{
+    if [[ $OS == Windows* ]] ; then
+        return 0
+    fi
+    return 1
+}
+
+function addToClassPath()
+{
+    local sep=:
+    local pwd=`pwd`
+    local isWindows=false;
+    if isWindows; then 
+        sep=";"
+        isWindows=true;
+    fi
+
+    while [ -n "$1" ] ; do
+        local value=$1
+        shift
+
+        if [[ $value == .* ]] ; then
+            value="$pwd/$value"
+        fi
+
+        $isWindows && value=`cygpath -w $value`
+
+        export CLASSPATH="$value$sep$CLASSPATH"
+    done
+}
+
+function devsetup()
+{
+  pwd=`pwd`
+
+  while [ "$pwd" != / ] ; do
+      if [ -r "$pwd"/devsetup.sh ] ; then
+          echo "Using configuration in $pwd/devsetup.sh"
+          source "$pwd"/devsetup.sh;
+          return;
+      else
+          pwd=`dirname "$pwd"`
+      fi
+  done
+  
+}

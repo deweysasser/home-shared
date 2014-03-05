@@ -1,0 +1,116 @@
+# change to a dir on the cd path, by partial match
+function dir()
+{
+    local i=0
+    local match
+    local name
+
+    for entry in `echo .:$CDPATH | tr ':' ' '`
+      do
+      for name in $entry/*$1*
+        do
+        if [ -d $name ]; then
+            match[$i]="$name"
+            i=$(( $i+1 ))
+        fi
+      done
+      
+    done
+    if [ ${#match[*]} -eq 1 ] ; then
+          # found only one match
+        pushd ${match[0]}
+        return;
+    else
+        echo "${#match[*]} matches:"
+        ls -d ${match[*]}
+        return;
+    fi
+}
+
+function xsltproc.jar
+{
+    java -jar ~/bin/share/xsltproc.jar $*
+}
+
+function showpath {
+    echo $PATH | tr : \\012
+}
+
+function rmpath {
+    echo $PATH | tr : \\012
+}
+
+function tpushd
+{
+    local file
+    local dir
+    
+    file=`taglocatefile $@`;
+
+    if [ "$file" == "" ] ; then
+        echo "Can't located $@"
+        return 1
+    fi
+
+    dir=`dirname $file`
+
+    pushd $dir;
+}
+
+function xsltproc.jar
+{
+    java -jar ~/bin/share/xsltproc.jar $*
+}
+
+function showpath {
+    echo $PATH | tr : \\012
+}
+
+function cpdep
+{
+   cp `ldd $1 | awk '{print $3}'` $2
+}
+
+function newdir()
+{
+    mkdir $1
+    cd $1
+}
+
+function setrootfrom()
+{
+    export CVSROOT=`cat $*/CVS/Root`
+}
+
+function find-climb() 
+{
+    (
+        while [ `pwd` != "/" ] ; do
+            if [ -e $1 ] ; then
+                pwd
+                exit 0;
+            fi
+            cd ..
+        done
+    )
+}
+
+function climb-to() {
+    where=`find-climb $1`
+    [ $? -eq 0 ] && pushd $where
+    return $?
+}
+
+function loadpackage() {
+    for path in "$@"; do
+        PKGROOT="$path"
+        if [ -f "$path/.package" ] ; then
+            source "$path/.package"
+        elif [ -d "$path/bin" ] ; then
+            export PATH="$PATH:$path/bin"
+        else
+            export PATH="$PATH:$path"
+        fi
+    done
+            
+}

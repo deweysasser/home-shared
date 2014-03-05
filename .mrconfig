@@ -1,5 +1,6 @@
-include = cat $HOME/.config/mr/`hostname`.conf
-include = cat $HOME/.config/mr/shared.conf
-include = cat $HOME/.config/mr/$USER.conf
+include = test -f $HOME/.config/mr/`hostname`.conf && cat $HOME/.config/mr/`hostname`.conf || true
+include = test -f $HOME/.config/mr/shared.conf && cat $HOME/.config/mr/shared.conf || true
+include = test -f $HOME/.config/mr/$USER.conf && cat $HOME/.config/mr/$USER.conf || true
+include = test -f $HOME/.config/mr/$USER-private.conf && cat $HOME/.config/mr/$USER-private.conf || true
 
 
