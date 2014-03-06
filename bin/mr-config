@@ -1,0 +1,170 @@
+#!/usr/bin/perl
+
+# Purpose:  help me manage MR configurations
+
+use strict;
+
+our $home = $ENV{"HOME"};
+our $hostname = `hostname`;
+chop $hostname;
+our $user=$ENV{"USERNAME"};
+our %Globals;
+
+$Globals{"confdir"} = "$home/.config/mr";
+$Globals{"availabledir"} = "$home/.config/mr/available.d";
+$Globals{"hostdir"} = "$home/.config/mr/host.d/$hostname";
+
+&main;
+
+sub main {
+
+    if($ARGV[0] eq "show") {
+	shift @ARGV;
+	my @available = &getFiles($Globals{"availabledir"});
+	my @toadd = &filter(\@available, @ARGV);
+	&showFiles(@toadd);
+    }
+    elsif($ARGV[0] eq "add") {
+	shift @ARGV;
+	my @available = &getFiles($Globals{"availabledir"});
+	my @toadd = &filter(\@available, @ARGV);
+	&addFiles($Globals{hostdir}, @toadd);
+	&showInUse;
+    }
+    elsif($ARGV[0] eq "remove") {
+	shift @ARGV;
+	my @available = &getFiles($Globals{"availabledir"});
+	my @toadd = &filter(\@available, @ARGV);
+	&removeFiles($Globals{hostdir}, @toadd);
+	&showInUse;
+    }
+    elsif($ARGV[0] eq "list") {
+	&cmd_list;
+    }
+    else {
+	&cmd_list;
+    }
+
+}
+
+sub addFiles{
+    my $dir = shift;
+    my @files = @_;
+
+    foreach my $file (@files) {
+	my $name = $file->{name};
+	my $path = "$dir/$name.conf";
+
+	unless (-r $path) {
+	    print "Adding $name\n";
+	    symlink("../../available.d/$name.conf", $path);
+	}
+    }
+}
+
+sub removeFiles{
+    my $dir = shift;
+    my @files = @_;
+
+    foreach my $file (@files) {
+	my $name = $file->{name};
+	my $path = "$dir/$name.conf";
+
+	if(-r $path) {
+	    print "Removing $name\n";
+	    unlink($path);
+	}
+    }
+}
+
+sub symlink {
+    my $target = shift;
+    my $ref = shift;
+
+    return !system("ln -s $target $ref");
+}
+
+sub filter {
+    my $filesRef = shift;
+    my @files = @{$filesRef};
+    my @args=@_;
+
+    my @results;
+
+    # make a regexp
+
+    my $re = "(" . join("|", @args) . ")";
+
+    foreach my $file (@files) {
+	my $tags = join(",", @{$file->{tags}});
+	my $name = $file->{name};
+
+	push(@results, $file) if($name =~ /$re/ || $tags =~ /$re/);
+    }
+
+    return @results;
+}
+
+sub cmd_list {
+    showInUse();
+    print "\nAvailable:\n";
+    &showFiles(&getFiles($Globals{"availabledir"}));
+}
+
+sub showInUse() {
+    print "In Use:\n";
+    &showFiles(&getFiles($Globals{"hostdir"}));
+}
+
+sub showFiles {
+    foreach my $file (@_) {
+	my $name = $file->{name};
+	my $description = $file->{description};
+	my @tags = @{$file->{tags}};
+
+	print " $name (@tags):  $description\n";
+    }
+}
+
+sub getFiles {
+    my $dir = shift;
+    my @files;
+
+    opendir(my $dh, $dir) || die("Failed to read $dir: $!");
+
+    while($_ = readdir($dh)) {
+	next unless /(.*)\.conf$/;
+	my $file;
+	$file->{name} = $1;
+	$file->{path} = "$dir/$_";
+	&getFileInfo($file);
+	push(@files, $file);
+    }
+
+    closedir($dh);
+
+    return @files;
+}
+
+sub getFileInfo {
+    my $file = shift;
+    my $path = $file->{path};
+
+    open(my $fh, $path) || die("could not read $file: $!");
+
+    my @tags;
+
+    while(<$fh>) {
+	if(/tags:(.*)/) {
+	    @tags = split(/\s+/, $1);
+	}
+	if(/description: (.*)/) {
+	    $file->{description} = $1;
+	}
+    }
+
+    $file->{tags}=\@tags;
+
+    close $fh;
+    return;
+}
