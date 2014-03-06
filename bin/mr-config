@@ -18,14 +18,16 @@ $Globals{"hostdir"} = "$home/.config/mr/host.d/$hostname";
 
 sub main {
 
+    print "* denotes configuration in use\n";
+
+    &readInUseFiles;
+
     if($ARGV[0] eq "show") {
 	shift @ARGV;
 	my @available = &getFiles($Globals{"availabledir"});
 	my @toadd = &filter(\@available, @ARGV);
 	print "Matches tags:\n";
 	&showFiles(@toadd);
-	print "\n";
-	&showInUse;
     }
     elsif($ARGV[0] eq "add") {
 	shift @ARGV;
@@ -48,6 +50,14 @@ sub main {
 	&cmd_list;
     }
 
+}
+
+sub readInUseFiles {
+    my @files = &getFiles($Globals{"hostdir"});
+
+    foreach my $file (@files) {
+	$Globals{inuse}->{$file->{name}}=$file;
+    }
 }
 
 sub addFiles{
@@ -92,40 +102,55 @@ sub filter {
     my @files = @{$filesRef};
     my @args=@_;
 
-    my @results;
+
 
     # make a regexp
 
     my $re = "(" . join("|", @args) . ")";
 
-    foreach my $file (@files) {
-	my $tags = join(",", @{$file->{tags}});
-	my $name = $file->{name};
-
-	push(@results, $file) if($name =~ /$re/ || $tags =~ /$re/);
+    foreach my $tag (@args) {
+	@files = grep { &shouldInclude($tag, $_) }  @files;
     }
 
-    return @results;
+    return @files;
+}
+
+sub shouldInclude {
+    my $tag = shift;
+    my $file = shift;
+    my $opposite = 0;
+
+    if($tag =~ /^!(.*)/) {
+	$opposite = 1;
+	$tag = $1;
+    }
+
+    my $predicate = $file->{name} =~ /$tag/ ||  join(",", @{$_->{tags}}) =~ /$tag/;
+
+    return $opposite ^ $predicate;
 }
 
 sub cmd_list {
-    showInUse();
     print "\nAvailable:\n";
     &showFiles(&getFiles($Globals{"availabledir"}));
 }
 
 sub showInUse() {
     print "In Use:\n";
-    &showFiles(&getFiles($Globals{"hostdir"}));
+    &showFiles(values(%{$Globals{inuse}}));
 }
 
 sub showFiles {
-    foreach my $file (@_) {
+
+    my @files = sort { $Globals{inuse}->{$a->{name}} <=> $Globals{inuse}->{$b->{name}}} @_;
+    foreach my $file (@files) {
 	my $name = $file->{name};
 	my $description = $file->{description};
 	my @tags = @{$file->{tags}};
+	
+	my $inuse = $Globals{inuse}->{$name}?"*":" ";
 
-	print " $name (@tags):  $description\n";
+	print " $inuse$name (@tags):  $description\n";
     }
 }
 
