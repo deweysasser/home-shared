@@ -1,0 +1,21 @@
+# -*- shell-script -*-
+#PS1="\033]2;\w\007bash$ "
+#PS1="\[\033];$WINDOW_TITLE in [\w]\007\033[32m\]\u@\h \[\033[33m\w\033[0m\] \n$ "
+#PS1='\h \W\n\$ '
+
+TITLEPROMPT="\h:\u \w"
+
+if [ "$TERM" == "emacs" ] ; then
+    PS1="------$TITLEPROMPT \n$ "
+else
+    PS1="\[\033];${WINDOW_TITLE:+$WINDOW_TITLE:  }$TITLEPROMPT\007\033[32m\]\u@\h \[\033[33m\w\033[0m\] \n$ "
+fi
+
+
+function title()
+{
+    local WINDOW_TITLE="$*"
+#    echo "]2;$*"
+    PS1="\[\033];$WINDOW_TITLE:  $TITLEPROMPT\007\033[32m\]\u@\h \[\033[33m\w\033[0m\] \n$ "
+}
+
