@@ -163,6 +163,8 @@ sub getFiles {
     my $os = `uname -o`;
     chop $os;
 
+    return () unless -d $dir;
+
     opendir(my $dh, $dir) || die("Failed to read $dir: $!");
 
     while($_ = readdir($dh)) {
