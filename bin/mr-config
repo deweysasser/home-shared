@@ -22,7 +22,10 @@ sub main {
 	shift @ARGV;
 	my @available = &getFiles($Globals{"availabledir"});
 	my @toadd = &filter(\@available, @ARGV);
+	print "Matches tags:\n";
 	&showFiles(@toadd);
+	print "\n";
+	&showInUse;
     }
     elsif($ARGV[0] eq "add") {
 	shift @ARGV;
@@ -130,6 +133,11 @@ sub getFiles {
     my $dir = shift;
     my @files;
 
+
+    # TODO:  make this more general
+    my $os = `uname -o`;
+    chop $os;
+
     opendir(my $dh, $dir) || die("Failed to read $dir: $!");
 
     while($_ = readdir($dh)) {
@@ -138,6 +146,10 @@ sub getFiles {
 	$file->{name} = $1;
 	$file->{path} = "$dir/$_";
 	&getFileInfo($file);
+	if($file->{constraint}) {
+#	    print "File $file->{name} has constraint $file->{constraint}.  We're $os\n";
+	    next unless $file->{constraint} =~ /$os/;
+	}
 	push(@files, $file);
     }
 
@@ -160,6 +172,9 @@ sub getFileInfo {
 	}
 	if(/description: (.*)/) {
 	    $file->{description} = $1;
+	}
+	if(/constraint: (.*)/) {
+	    $file->{constraint} = $1;
 	}
     }
 
